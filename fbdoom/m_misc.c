@@ -52,14 +52,8 @@
 // Create a directory
 //
 
-void M_MakeDirectory(char *path)
-{
-#ifdef _WIN32
-    mkdir(path);
-#else
-    mkdir(path, 0755);
-#endif
-}
+void M_MakeDirectory(char *path) {}
+
 
 // Check if a file exists
 

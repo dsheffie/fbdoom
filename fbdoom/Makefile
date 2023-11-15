@@ -5,13 +5,8 @@
 # $Log:$
 #
 
-CROSS_COMPILE ?= #arm-linux-gnueabihf-
-
-ifeq ($(V),1)
-	VB=''
-else
-	VB=@
-endif
+CROSS_COMPILE = riscv32-unknown-elf-
+VB=''
 
 #LIBS+=-lXext -lX11 -lnsl -lm -lSDL
 #CFLAGS+=-Wunused-const-variable=0 
@@ -20,10 +15,11 @@ OBJS+=$(OBJDIR)/i_video_fbdev.o
 OBJS+=$(OBJDIR)/i_input_tty.o
 
 CC=$(CROSS_COMPILE)gcc  # gcc or g++
-CFLAGS+=-ggdb3 -Os
+CFLAGS+=-O3
 LDFLAGS+=-Wl,--gc-sections
-CFLAGS+=-ggdb3 -Wall -DNORMALUNIX -DLINUX -DSNDSERV # -DUSEASM
+CFLAGS+=-Wall -DNORMALUNIX -DLINUX -DSNDSERV # -DUSEASM
 LIBS+=-lm -lc
+NOSDL=1
 
 ifneq ($(NOSDL),1)
 	LIBS+= -lSDL
@@ -46,8 +42,7 @@ clean:
 
 $(OUTPUT):	$(OBJS)
 	@echo [Linking $@]
-	$(VB)$(CC) $(CFLAGS) $(LDFLAGS) $(OBJS) \
-	-o $(OUTPUT) $(LIBS) -Wl,-Map,$(OUTPUT).map
+	$(VB)$(CC) $(CFLAGS) $(LDFLAGS) $(OBJS) -o $(OUTPUT) $(LIBS) -Wl,-Map,$(OUTPUT).map -specs=htif.specs
 	@echo [Size]
 	-$(CROSS_COMPILE)size $(OUTPUT)
 

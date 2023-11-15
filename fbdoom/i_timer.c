@@ -36,6 +36,7 @@ int I_GetTicks(void)
     struct timezone tzp;
   
     gettimeofday(&tp, &tzp);
+    
     return (tp.tv_sec * 1000) + (tp.tv_usec / 1000); /* return milliseconds */
 }
 
@@ -74,8 +75,8 @@ int I_GetTimeMS(void)
 
 void I_Sleep(int ms)
 {
-    //SDL_Delay(ms);
-    usleep (ms * 1000);    
+  //SDL_Delay(ms);
+  //usleep (ms * 1000);    
 }
 
 void I_WaitVBL(int count)

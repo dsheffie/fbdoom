@@ -24,10 +24,10 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <stdio.h>
-#include <termios.h>
-#include <sys/ioctl.h>
-#include <linux/keyboard.h>
-#include <linux/kd.h>
+//#include <termios.h>
+//#include <sys/ioctl.h>
+//#include <linux/keyboard.h>
+//#include <linux/kd.h>
 
 #include "config.h"
 #include "deh_str.h"
@@ -234,26 +234,27 @@ static const char shiftxform[] =
 
 int tty_is_kbd(int fd)
 {
-    int data = 0;
+    /* int data = 0; */
 
-    if (ioctl(fd, KDGKBTYPE, &data) != 0)
-        return 0;
+    /* if (ioctl(fd, KDGKBTYPE, &data) != 0) */
+    /*     return 0; */
 
-    if (data == KB_84) {
-        printf("84-key keyboard found.\n");
-        return 1;
-    } else if (data == KB_101) {
-        printf("101-key keyboard found.\n");
-        return 1;
-    } else {
-        printf("KDGKBTYPE = 0x%x.\n", data);
-        return 0;
-    }
+    /* if (data == KB_84) { */
+    /*     printf("84-key keyboard found.\n"); */
+    /*     return 1; */
+    /* } else if (data == KB_101) { */
+    /*     printf("101-key keyboard found.\n"); */
+    /*     return 1; */
+    /* } else { */
+    /*     printf("KDGKBTYPE = 0x%x.\n", data); */
+    /*     return 0; */
+    /* } */
+  return 1;
 }
 
-static int old_mode = -1;
-static struct termios old_term;
-static int kb = -1; /* keyboard file descriptor */
+//static int old_mode = -1;
+//static struct termios old_term;
+//static int kb = -1; /* keyboard file descriptor */
 
 void kbd_shutdown(void)
 {
@@ -263,117 +264,118 @@ void kbd_shutdown(void)
     fflush(stdout);
 
     printf("Exiting normally.\n");
-    if (old_mode != -1) {
-        ioctl(kb, KDSKBMODE, old_mode);
-        tcsetattr(kb, 0, &old_term);
-    }
+    /* if (old_mode != -1) { */
+    /*     ioctl(kb, KDSKBMODE, old_mode); */
+    /*     tcsetattr(kb, 0, &old_term); */
+    /* } */
 
-    if (kb > 3)
-        close(kb);
+    /* if (kb > 3) */
+    /*     close(kb); */
 
     exit(0);
 }
 
 static int kbd_init(void)
 {
-    struct termios new_term;
-    char *files_to_try[] = {"/dev/tty", "/dev/tty0", "/dev/console", NULL};
-    int i;
-    int flags;
-    int found = 0;
+    /* struct termios new_term; */
+    /* char *files_to_try[] = {"/dev/tty", "/dev/tty0", "/dev/console", NULL}; */
+    /* int i; */
+    /* int flags; */
+    /* int found = 0; */
 
-    /* First we need to find a file descriptor that represents the
-       system's keyboard. This should be /dev/tty, /dev/console,
-       stdin, stdout, or stderr. We'll try them in that order.
-       If none are acceptable, we're probably not being run
-       from a VT. */
-    for (i = 0; files_to_try[i] != NULL; i++) {
-        /* Try to open the file. */
-        kb = open(files_to_try[i], O_RDONLY);
-        if (kb < 0) continue;
-        /* See if this is valid for our purposes. */
-        if (tty_is_kbd(kb)) {
-            printf("Using keyboard on %s.\n", files_to_try[i]);
-            found = 1;
-            break;
-        }
-        close(kb);
-    }
+    /* /\* First we need to find a file descriptor that represents the */
+    /*    system's keyboard. This should be /dev/tty, /dev/console, */
+    /*    stdin, stdout, or stderr. We'll try them in that order. */
+    /*    If none are acceptable, we're probably not being run */
+    /*    from a VT. *\/ */
+    /* for (i = 0; files_to_try[i] != NULL; i++) { */
+    /*     /\* Try to open the file. *\/ */
+    /*     kb = open(files_to_try[i], O_RDONLY); */
+    /*     if (kb < 0) continue; */
+    /*     /\* See if this is valid for our purposes. *\/ */
+    /*     if (tty_is_kbd(kb)) { */
+    /*         printf("Using keyboard on %s.\n", files_to_try[i]); */
+    /*         found = 1; */
+    /*         break; */
+    /*     } */
+    /*     close(kb); */
+    /* } */
 
-    /* If those didn't work, not all is lost. We can try the
-       3 standard file descriptors, in hopes that one of them
-       might point to a console. This is not especially likely. */
-    if (files_to_try[i] == NULL) {
-        for (kb = 0; kb < 3; kb++) {
-            if (tty_is_kbd(i)) {
-                found = 1;
-                break;
-            }
-        }
-    }
+    /* /\* If those didn't work, not all is lost. We can try the */
+    /*    3 standard file descriptors, in hopes that one of them */
+    /*    might point to a console. This is not especially likely. *\/ */
+    /* if (files_to_try[i] == NULL) { */
+    /*     for (kb = 0; kb < 3; kb++) { */
+    /*         if (tty_is_kbd(i)) { */
+    /*             found = 1; */
+    /*             break; */
+    /*         } */
+    /*     } */
+    /* } */
 
-    if (!found) {
-        printf("Unable to find a file descriptor associated with "\
-                "the keyboard.\n" \
-                "Perhaps you're not using a virtual terminal?\n");
-        return 1;
-    }
+    /* if (!found) { */
+    /*     printf("Unable to find a file descriptor associated with "\ */
+    /*             "the keyboard.\n" \ */
+    /*             "Perhaps you're not using a virtual terminal?\n"); */
+    /*     return 1; */
+    /* } */
 
-    /* Find the keyboard's mode so we can restore it later. */
-    if (ioctl(kb, KDGKBMODE, &old_mode) != 0) {
-        printf("Unable to query keyboard mode.\n");
-        kbd_shutdown();
-    }
+    /* /\* Find the keyboard's mode so we can restore it later. *\/ */
+    /* if (ioctl(kb, KDGKBMODE, &old_mode) != 0) { */
+    /*     printf("Unable to query keyboard mode.\n"); */
+    /*     kbd_shutdown(); */
+    /* } */
 
-    /* Adjust the terminal's settings. In particular, disable
-       echoing, signal generation, and line buffering. Any of
-       these could cause trouble. Save the old settings first. */
-    if (tcgetattr(kb, &old_term) != 0) {
-        printf("Unable to query terminal settings.\n");
-        kbd_shutdown();
-    }
+    /* /\* Adjust the terminal's settings. In particular, disable */
+    /*    echoing, signal generation, and line buffering. Any of */
+    /*    these could cause trouble. Save the old settings first. *\/ */
+    /* if (tcgetattr(kb, &old_term) != 0) { */
+    /*     printf("Unable to query terminal settings.\n"); */
+    /*     kbd_shutdown(); */
+    /* } */
 
-    new_term = old_term;
-    new_term.c_iflag = 0;
-    new_term.c_lflag &= ~(ECHO | ICANON | ISIG);
+    /* new_term = old_term; */
+    /* new_term.c_iflag = 0; */
+    /* new_term.c_lflag &= ~(ECHO | ICANON | ISIG); */
 
-    /* TCSAFLUSH discards unread input before making the change.
-       A good idea. */
-    if (tcsetattr(kb, TCSAFLUSH, &new_term) != 0) {
-        printf("Unable to change terminal settings.\n");
-    }
+    /* /\* TCSAFLUSH discards unread input before making the change. */
+    /*    A good idea. *\/ */
+    /* if (tcsetattr(kb, TCSAFLUSH, &new_term) != 0) { */
+    /*     printf("Unable to change terminal settings.\n"); */
+    /* } */
     
-    /* Put the keyboard in mediumraw mode. */
-    if (ioctl(kb, KDSKBMODE, K_MEDIUMRAW) != 0) {
-        printf("Unable to set mediumraw mode.\n");
-        kbd_shutdown();
-    }
+    /* /\* Put the keyboard in mediumraw mode. *\/ */
+    /* if (ioctl(kb, KDSKBMODE, K_MEDIUMRAW) != 0) { */
+    /*     printf("Unable to set mediumraw mode.\n"); */
+    /*     kbd_shutdown(); */
+    /* } */
 
-    /* Put in non-blocking mode */
-    flags = fcntl(kb, F_GETFL, 0);
-    fcntl(kb, F_SETFL, flags | O_NONBLOCK);
+    /* /\* Put in non-blocking mode *\/ */
+    /* flags = fcntl(kb, F_GETFL, 0); */
+    /* fcntl(kb, F_SETFL, flags | O_NONBLOCK); */
 
-    printf("Ready to read keycodes. Press Backspace to exit.\n");
+    /* printf("Ready to read keycodes. Press Backspace to exit.\n"); */
 
     return 0;
 }
 
 int kbd_read(int *pressed, unsigned char *key)
 {
-    unsigned char data;
+    /* unsigned char data; */
 
-    if (read(kb, &data, 1) < 1) {
-        return 0;
-    }
+    /* if (read(kb, &data, 1) < 1) { */
+    /*     return 0; */
+    /* } */
 
-    *pressed = (data & 0x80) == 0x80;
-    *key = data & 0x7F;
+    /* *pressed = (data & 0x80) == 0x80; */
+    /* *key = data & 0x7F; */
 
-    /* Print the keycode. The top bit is the pressed/released
-       flag, and the lower seven are the keycode. */
-    //printf("%s: 0x%2X (%i)\n", *pressed ? "Released" : " Pressed", (unsigned int)*key, (unsigned int)*key);
+    /* /\* Print the keycode. The top bit is the pressed/released */
+    /*    flag, and the lower seven are the keycode. *\/ */
+    /* //printf("%s: 0x%2X (%i)\n", *pressed ? "Released" : " Pressed", (unsigned int)*key, (unsigned int)*key); */
 
-    return 1;
+    /* return 1; */
+  return 0;
 }
 
 static unsigned char TranslateKey(unsigned char key)
