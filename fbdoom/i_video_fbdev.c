@@ -318,7 +318,7 @@ void I_FinishUpdate (void)
   for(int i = 0; i < SCREENWIDTH*SCREENHEIGHT; i++) {
     line_out[i] = colors[line_in[i]];
   }
-  SYSCALL1(0x1337, line_out);
+  SYSCALL1(0x1337, (uintptr_t)line_out);
 }
 
 //
