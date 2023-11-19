@@ -104,28 +104,6 @@ typedef struct
 
 static uint16_t rgb565_palette[256];
 
-void cmap_to_rgb565(uint16_t * out, uint8_t * in, int in_pixels)
-{
-    int i, j;
-    struct color c;
-    uint16_t r, g, b;
-
-    for (i = 0; i < in_pixels; i++)
-    {
-        c = colors[*in]; 
-        r = ((uint16_t)(c.r >> 3)) << 11;
-        g = ((uint16_t)(c.g >> 2)) << 5;
-        b = ((uint16_t)(c.b >> 3)) << 0;
-        *out = (r | g | b);
-
-        in++;
-        for (j = 0; j < fb_scaling; j++) {
-            out++;
-        }
-    }
-}
-
-
 void I_InitGraphics (void)
 {
     printf("I_InitGraphics: DOOM screen size: w x h: %d x %d\n", SCREENWIDTH, SCREENHEIGHT);
@@ -327,25 +305,20 @@ __attribute__ ((weak)) void I_StartTic (void)
 void I_UpdateNoBlit (void) {}
 
 
-typedef struct {
-  uint8_t b;
-  uint8_t g;
-  uint8_t r;
-  uint8_t a;
-} pixel_t;
+extern long htif_syscall(uint64_t, uint64_t, uint64_t, unsigned long);
+
+#define SYSCALL1(n, a0) \
+    htif_syscall((a0), 0, 0, (n))
 
 void I_FinishUpdate (void)
 {
   unsigned char *line_in = (unsigned char *) I_VideoBuffer;
-  pixel_t *line_out = (pixel_t*) I_VideoBuffer_FB;
+  struct color *line_out = (struct color*) I_VideoBuffer_FB;
 
   for(int i = 0; i < SCREENWIDTH*SCREENHEIGHT; i++) {
-    struct color c = colors[line_in[i]];  /* R:8 G:8 B:8 format! */
-    line_out[i].b = c.b;
-    line_out[i].g = c.g;
-    line_out[i].r = c.r;
-    line_out[i].a = c.a;    
+    line_out[i] = colors[line_in[i]];
   }
+  SYSCALL1(0x1337, line_out);
 }
 
 //
