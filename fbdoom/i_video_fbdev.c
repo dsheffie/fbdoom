@@ -155,14 +155,6 @@ void I_InitGraphics (void)
     I_VideoBuffer_FB = (byte*)mmap_mem(fbsz*2);
 
 
-    //uint32_t *test_buffer = (uint32_t*)mmap_mem(1024*1024*sizeof(uint32_t));
-    //for(int i = 0; i < 1024*1024; i++) {
-    // ((volatile uint32_t*)test_buffer)[i] = 0xdeadface;
-    //}
-    //munmap(test_buffer, 1024*1024*sizeof(uint32_t));
-    
-    
-    //malloc(SCREENWIDTH * SCREENHEIGHT * 4);     // For a single write() syscall to fbdev
     
     screenvisible = true;
     
@@ -211,24 +203,41 @@ static double last_time = 0.0;
 #define FRAMES_PER_STAT (512)
 int bufid = 0;
 
+#define PREFETCH(X) { (void)*((volatile unsigned char*)(X)); }
+
 void I_FinishUpdate (void) {
   unsigned char *line_in = (unsigned char *) I_VideoBuffer;
   volatile struct color *line_out = (volatile struct color*) &I_VideoBuffer_FB[bufid*fbsz];
   volatile uint64_t *line_out64 = (volatile uint64_t*) &I_VideoBuffer_FB[bufid*fbsz];
   uint32_t *colors_32 = (uint32_t*)colors;  
   bufid = (bufid+1) & 1;
-  
-#if 1
-  for(int i = 0,j=0; i < SCREENWIDTH*SCREENHEIGHT; i+=2,j++) {
-    uint64_t c = colors_32[line_in[i+0]];
-    c |=  ((uint64_t)colors_32[line_in[i+1]]) <<32;
-    line_out64[j] = c;
-    //line_out[i] = colors[line_in[i]];
-    //line_out[i + (fbsz/sizeof(struct color))] = colors[0];
-    //line_out[i + 2*(fbsz/sizeof(struct color))] = colors[0];    
+
+  for(int ii = 0, j=0; ii < SCREENWIDTH*SCREENHEIGHT; ii+=16) {
+    /* pretetch pixel on next cacheline */
+    //unsigned char pf = *((volatile unsigned char*)&line_in[ii+16]);
+    //(void)pf;
+    PREFETCH(&line_in[ii+16]);
+    
+    PREFETCH(&line_out64[j+8]);
+    PREFETCH(&line_out64[j+10]);
+    PREFETCH(&line_out64[j+12]);
+    PREFETCH(&line_out64[j+14]);            
+    asm __volatile__("": : :"memory");
+    
+    for(int i = ii; i < (ii+16); i+=2) {
+      uint64_t c = colors_32[line_in[i+0]];
+      c |=  ((uint64_t)colors_32[line_in[i+1]]) <<32;
+      line_out64[j++] = c;
+    }
   }
+  
+  //for(int i = 0,j=0; i < SCREENWIDTH*SCREENHEIGHT; i+=2,j++) {
+  //uint64_t c = colors_32[line_in[i+0]];
+  //c |=  ((uint64_t)colors_32[line_in[i+1]]) <<32;
+  //line_out64[j] = c;
+  //}
   // asm volatile ("fence.i" ::: "memory"); 
-#endif
+
   
   if((n_frames_rendered % FRAMES_PER_STAT) == 0) {
     uint64_t icnt = rdinstret();
