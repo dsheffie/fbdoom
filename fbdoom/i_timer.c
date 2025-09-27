@@ -22,6 +22,7 @@
 #include <stdarg.h>
 #include <sys/time.h>
 #include <unistd.h>
+#include <stdio.h>
 
 //
 // I_GetTime
@@ -29,24 +30,6 @@
 //
 
 static uint32_t basetime = 0;
-
-static inline uint32_t rdcycle() {
-  uint32_t x;
-  __asm__ __volatile__ ("rdcycle %0" : "=r"(x));
-  return x;
-}
-
-static inline uint32_t rdcycleh() {
-  uint32_t x;
-  __asm__ __volatile__ ("rdcycleh %0" : "=r"(x));
-  return x;
-}
-
-static int rdcycle_msec(void) {
-  uint64_t x = rdcycleh();
-  x = (x << 32) | rdcycle();
-  return (int)(((double)x) * 1e-5);
-}
 
 
 int I_GetTicks(void)
@@ -93,8 +76,9 @@ int I_GetTimeMS(void)
 
 void I_Sleep(int ms)
 {
+  //printf("want to sleep for %d ms\n", ms);
   //SDL_Delay(ms);
-  //usleep (ms * 1000);    
+  usleep (ms * 1000);    
 }
 
 void I_WaitVBL(int count)

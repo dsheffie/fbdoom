@@ -35,6 +35,7 @@ rcsid[] = "$Id: i_x.c,v 1.6 1997/02/03 22:45:10 b1 Exp $";
 
 #include "tables.h"
 #include "doomkeys.h"
+#include "rvprint.h"
 
 #include <stdbool.h>
 #include <stdlib.h>
@@ -44,6 +45,7 @@ rcsid[] = "$Id: i_x.c,v 1.6 1997/02/03 22:45:10 b1 Exp $";
 #include <stdarg.h>
 #include <sys/time.h>
 #include <sys/types.h>
+#include <sys/mman.h>
 
 int fb_scaling = 1;
 int usemouse = 0;
@@ -58,15 +60,13 @@ struct color {
 static struct color colors[256];
 
 // The screen buffer; this is modified to draw things to the screen
-
-byte *I_VideoBuffer = NULL;
-byte *I_VideoBuffer_FB = NULL;
+byte *I_VideoBuffer = NULL, *I_VideoBuffer_FB = NULL;
+static size_t fbsz = 0;
 
 /* framebuffer file descriptor */
 int fd_fb = 0;
 
-int	X_width;
-int X_height;
+int X_width,  X_height;
 
 // If true, game is running as a screensaver
 
@@ -95,31 +95,84 @@ int usegamma = 0;
 
 typedef struct
 {
-	byte r;
-	byte g;
-	byte b;
+  byte r;
+  byte g;
+  byte b;
 } col_t;
 
 // Palette converted to RGB565
 
 static uint16_t rgb565_palette[256];
 
+static double timestamp() {
+  struct timeval tv;
+  gettimeofday(&tv, NULL);
+  return tv.tv_sec + ((double)tv.tv_usec)*1e-6;
+}
+
+
+#define __asm_syscall(...) \
+        __asm__ __volatile__ ("ecall\n\t" \
+        : "+r"(a0) : __VA_ARGS__ : "memory"); \
+	return a0; \
+
+
+static inline long va2pa(void *a)
+{
+  register long a7 __asm__("a7") = 257;
+  register long a0 __asm__("a0") = (uintptr_t)a;
+  __asm_syscall("r"(a7), "0"(a0))
+}
+
+
+static void* mmap_mem(size_t n_bytes) {
+  void *ptr = NULL;
+  if(n_bytes > getpagesize()) {
+    ptr = mmap(0, n_bytes, PROT_READ|PROT_WRITE, MAP_ANON | MAP_PRIVATE | MAP_HUGETLB, -1, 0);
+  }
+  if(ptr == (void*)(-1L) || ptr == NULL ) {
+    ptr = mmap(0, n_bytes, PROT_READ|PROT_WRITE, MAP_ANON | MAP_PRIVATE, -1, 0);
+  }
+  printf("buffer of size %zu starts at %p, mapped to phys addr %lx\n", n_bytes, ptr, va2pa(ptr));
+  return ptr;
+}
+
+static size_t next_pow2(size_t x) {
+  size_t y = 1;
+  while(y < x) {
+    y *= 2;
+  }
+  return y;
+}
+
 void I_InitGraphics (void)
 {
     printf("I_InitGraphics: DOOM screen size: w x h: %d x %d\n", SCREENWIDTH, SCREENHEIGHT);
     /* Allocate screen to draw to */
-    I_VideoBuffer = (byte*)Z_Malloc (SCREENWIDTH * SCREENHEIGHT, PU_STATIC, NULL);  // For DOOM to draw on
-    I_VideoBuffer_FB = (byte*)malloc(SCREENWIDTH * SCREENHEIGHT * 4);     // For a single write() syscall to fbdev
+    I_VideoBuffer = (byte*)mmap_mem(SCREENWIDTH * SCREENHEIGHT);
+
+    fbsz = next_pow2(SCREENWIDTH * SCREENHEIGHT * 4);
+    I_VideoBuffer_FB = (byte*)mmap_mem(fbsz*2);
+
+
+    //uint32_t *test_buffer = (uint32_t*)mmap_mem(1024*1024*sizeof(uint32_t));
+    //for(int i = 0; i < 1024*1024; i++) {
+    // ((volatile uint32_t*)test_buffer)[i] = 0xdeadface;
+    //}
+    //munmap(test_buffer, 1024*1024*sizeof(uint32_t));
+    
+    
+    //malloc(SCREENWIDTH * SCREENHEIGHT * 4);     // For a single write() syscall to fbdev
+    
     screenvisible = true;
     
     extern int I_InitInput(void);
     I_InitInput();
 }
 
-void I_ShutdownGraphics (void)
-{
-	Z_Free (I_VideoBuffer);
-	free(I_VideoBuffer_FB);
+void I_ShutdownGraphics (void) {
+  munmap(I_VideoBuffer, SCREENWIDTH * SCREENHEIGHT);
+  munmap(I_VideoBuffer_FB, 2*fbsz);
 }
 
 void I_StartFrame (void)
@@ -127,175 +180,7 @@ void I_StartFrame (void)
 
 }
 
-__attribute__ ((weak)) void I_GetEvent (void)
-{
-//	event_t event;
-//	bool button_state;
-//
-//	button_state = button_read ();
-//
-//	if (last_button_state != button_state)
-//	{
-//		last_button_state = button_state;
-//
-//		event.type = last_button_state ? ev_keydown : ev_keyup;
-//		event.data1 = KEY_FIRE;
-//		event.data2 = -1;
-//		event.data3 = -1;
-//
-//		D_PostEvent (&event);
-//	}
-//
-//	touch_main ();
-//
-//	if ((touch_state.x != last_touch_state.x) || (touch_state.y != last_touch_state.y) || (touch_state.status != last_touch_state.status))
-//	{
-//		last_touch_state = touch_state;
-//
-//		event.type = (touch_state.status == TOUCH_PRESSED) ? ev_keydown : ev_keyup;
-//		event.data1 = -1;
-//		event.data2 = -1;
-//		event.data3 = -1;
-//
-//		if ((touch_state.x > 49)
-//		 && (touch_state.x < 72)
-//		 && (touch_state.y > 104)
-//		 && (touch_state.y < 143))
-//		{
-//			// select weapon
-//			if (touch_state.x < 60)
-//			{
-//				// lower row (5-7)
-//				if (touch_state.y < 119)
-//				{
-//					event.data1 = '5';
-//				}
-//				else if (touch_state.y < 131)
-//				{
-//					event.data1 = '6';
-//				}
-//				else
-//				{
-//					event.data1 = '1';
-//				}
-//			}
-//			else
-//			{
-//				// upper row (2-4)
-//				if (touch_state.y < 119)
-//				{
-//					event.data1 = '2';
-//				}
-//				else if (touch_state.y < 131)
-//				{
-//					event.data1 = '3';
-//				}
-//				else
-//				{
-//					event.data1 = '4';
-//				}
-//			}
-//		}
-//		else if (touch_state.x < 40)
-//		{
-//			// button bar at bottom screen
-//			if (touch_state.y < 40)
-//			{
-//				// enter
-//				event.data1 = KEY_ENTER;
-//			}
-//			else if (touch_state.y < 80)
-//			{
-//				// escape
-//				event.data1 = KEY_ESCAPE;
-//			}
-//			else if (touch_state.y < 120)
-//			{
-//				// use
-//				event.data1 = KEY_USE;
-//			}
-//			else if (touch_state.y < 160)
-//			{
-//				// map
-//				event.data1 = KEY_TAB;
-//			}
-//			else if (touch_state.y < 200)
-//			{
-//				// pause
-//				event.data1 = KEY_PAUSE;
-//			}
-//			else if (touch_state.y < 240)
-//			{
-//				// toggle run
-//				if (touch_state.status == TOUCH_PRESSED)
-//				{
-//					run = !run;
-//
-//					event.data1 = KEY_RSHIFT;
-//
-//					if (run)
-//					{
-//						event.type = ev_keydown;
-//					}
-//					else
-//					{
-//						event.type = ev_keyup;
-//					}
-//				}
-//				else
-//				{
-//					return;
-//				}
-//			}
-//			else if (touch_state.y < 280)
-//			{
-//				// save
-//				event.data1 = KEY_F2;
-//			}
-//			else if (touch_state.y < 320)
-//			{
-//				// load
-//				event.data1 = KEY_F3;
-//			}
-//		}
-//		else
-//		{
-//			// movement/menu navigation
-//			if (touch_state.x < 100)
-//			{
-//				if (touch_state.y < 100)
-//				{
-//					event.data1 = KEY_STRAFE_L;
-//				}
-//				else if (touch_state.y < 220)
-//				{
-//					event.data1 = KEY_DOWNARROW;
-//				}
-//				else
-//				{
-//					event.data1 = KEY_STRAFE_R;
-//				}
-//			}
-//			else if (touch_state.x < 180)
-//			{
-//				if (touch_state.y < 160)
-//				{
-//					event.data1 = KEY_LEFTARROW;
-//				}
-//				else
-//				{
-//					event.data1 = KEY_RIGHTARROW;
-//				}
-//			}
-//			else
-//			{
-//				event.data1 = KEY_UPARROW;
-//			}
-//		}
-//
-//		D_PostEvent (&event);
-//	}
-}
+__attribute__ ((weak)) void I_GetEvent (void){ }
 
 __attribute__ ((weak)) void I_StartTic (void)
 {
@@ -305,20 +190,89 @@ __attribute__ ((weak)) void I_StartTic (void)
 void I_UpdateNoBlit (void) {}
 
 
-extern long htif_syscall(uint64_t, uint64_t, uint64_t, unsigned long);
 
-#define SYSCALL1(n, a0) \
-    htif_syscall((a0), 0, 0, (n))
+static uint64_t n_frames_rendered = 0;
 
-void I_FinishUpdate (void)
-{
+static uint64_t l1d[2] = {0};
+static uint64_t l1i[2] = {0};
+static uint64_t l2[2] = {0};
+
+static uint64_t last_icnt = 0;
+static uint64_t last_cycle = 0;
+static uint64_t last_mispred = 0;
+
+static uint64_t last_l1d[2] = {0};
+static uint64_t last_l1i[2] = {0};
+static uint64_t last_l2[2] = {0};
+
+
+static double last_time = 0.0;
+
+#define FRAMES_PER_STAT (512)
+int bufid = 0;
+
+void I_FinishUpdate (void) {
   unsigned char *line_in = (unsigned char *) I_VideoBuffer;
-  struct color *line_out = (struct color*) I_VideoBuffer_FB;
-
-  for(int i = 0; i < SCREENWIDTH*SCREENHEIGHT; i++) {
-    line_out[i] = colors[line_in[i]];
+  volatile struct color *line_out = (volatile struct color*) &I_VideoBuffer_FB[bufid*fbsz];
+  volatile uint64_t *line_out64 = (volatile uint64_t*) &I_VideoBuffer_FB[bufid*fbsz];
+  uint32_t *colors_32 = (uint32_t*)colors;  
+  bufid = (bufid+1) & 1;
+  
+#if 1
+  for(int i = 0,j=0; i < SCREENWIDTH*SCREENHEIGHT; i+=2,j++) {
+    uint64_t c = colors_32[line_in[i+0]];
+    c |=  ((uint64_t)colors_32[line_in[i+1]]) <<32;
+    line_out64[j] = c;
+    //line_out[i] = colors[line_in[i]];
+    //line_out[i + (fbsz/sizeof(struct color))] = colors[0];
+    //line_out[i + 2*(fbsz/sizeof(struct color))] = colors[0];    
   }
-  SYSCALL1(0x1337, (uintptr_t)line_out);
+  // asm volatile ("fence.i" ::: "memory"); 
+#endif
+  
+  if((n_frames_rendered % FRAMES_PER_STAT) == 0) {
+    uint64_t icnt = rdinstret();
+    uint64_t cycle = rdcycle();
+    uint64_t mispred = rdbrmispred();
+
+    rd_l1d(l1d);
+    rd_l1i(l1i);
+    rd_l2(l2);
+    
+    uint64_t insn_delta = icnt-last_icnt;
+    double ipc = ((double)icnt) / (cycle);
+    double jpki = (1000.0 * (mispred)) / icnt;
+    double insn_per_frame = ((double)insn_delta)/FRAMES_PER_STAT;
+
+    uint64_t l2_misses = (l2[1] - l2[0]);
+    uint64_t l1d_misses = (l1d[1] - l1d[0]);
+    uint64_t l1i_misses = (l1i[1] - l1i[0]);
+
+    double l1d_mpki = 1000.0 * (((double)l1d_misses) / icnt);
+    double l1i_mpki = 1000.0 * (((double)l1i_misses) / icnt);    
+    double l2_mpki = 1000.0 * (((double)l2_misses) / icnt);
+
+    double now = timestamp();
+    
+    printf("%lu insn, %g insn per frame, %g ipc, %g jpki, %g l1d mpki, %g l1i mpki, %g l2 mpki, %g fps\n",
+	   insn_delta, insn_per_frame, ipc, jpki,
+	   l1d_mpki,
+	   l1i_mpki,
+	   l2_mpki,
+	   ((double)FRAMES_PER_STAT)/(now-last_time));
+    
+    last_icnt = icnt;
+    last_cycle = cycle;
+    last_mispred = mispred;
+    last_l1d[0] = l1d[0];
+    last_l1i[0] = l1i[0];
+    last_l2[0] = l2[0];
+    last_l1d[1] = l1d[1];
+    last_l1i[1] = l1i[1];
+    last_l2[1] = l2[1];
+    last_time = now;
+  }
+  ++n_frames_rendered;  
 }
 
 //
@@ -339,33 +293,15 @@ void I_ReadScreen (byte* scr)
 
 void I_SetPalette (byte* palette)
 {
-	int i;
-	//col_t* c;
-
-	//for (i = 0; i < 256; i++)
-	//{
-	//	c = (col_t*)palette;
-
-	//	rgb565_palette[i] = GFX_RGB565(gammatable[usegamma][c->r],
-	//								   gammatable[usegamma][c->g],
-	//								   gammatable[usegamma][c->b]);
-
-	//	palette += 3;
-	//}
-    
-
-    /* performance boost:
-     * map to the right pixel format over here! */
-
-    for (i=0; i<256; ++i ) {
-        colors[i].a = 0;
-        colors[i].r = gammatable[usegamma][*palette++];
-        colors[i].g = gammatable[usegamma][*palette++];
-        colors[i].b = gammatable[usegamma][*palette++];
-    }
-
-    /* Set new color map in kernel framebuffer driver */
-    //XXX FIXME ioctl(fd_fb, IOCTL_FB_PUTCMAP, colors);
+  /* performance boost:
+   * map to the right pixel format over here! */
+  
+  for (int i =0; i<256; ++i ) {
+    colors[i].a = 0;
+    colors[i].r = gammatable[usegamma][*palette++];
+    colors[i].g = gammatable[usegamma][*palette++];
+    colors[i].b = gammatable[usegamma][*palette++];
+  }
 }
 
 // Given an RGB value, find the closest matching palette index.
@@ -406,33 +342,19 @@ int I_GetPaletteIndex (int r, int g, int b)
     return best;
 }
 
-void I_BeginRead (void)
-{
-}
+void I_BeginRead (void) {}
 
-void I_EndRead (void)
-{
-}
+void I_EndRead (void) {}
 
-void I_SetWindowTitle (char *title)
-{
-}
+void I_SetWindowTitle (char *title) {}
 
-void I_GraphicsCheckCommandLine (void)
-{
-}
+void I_GraphicsCheckCommandLine (void) {}
 
-void I_SetGrabMouseCallback (grabmouse_callback_t func)
-{
-}
+void I_SetGrabMouseCallback (grabmouse_callback_t func) {}
 
-void I_EnableLoadingDisk(void)
-{
-}
+void I_EnableLoadingDisk(void) {}
 
-void I_BindVideoVariables (void)
-{
-}
+void I_BindVideoVariables (void) {}
 
 void I_DisplayFPSDots (boolean dots_on)
 {

@@ -80,20 +80,19 @@ STlib_initNum
 //  based on differences from the old number.
 // Note: worth the trouble?
 //
-void
-STlib_drawNum
-( st_number_t*	n,
-  boolean	refresh )
+void STlib_drawNum ( st_number_t*	n, boolean refresh )
 {
-
-    int		numdigits = n->width;
-    int		num = *n->num;
-    
-    int		w = SHORT(n->p[0]->width);
-    int		h = SHORT(n->p[0]->height);
-    int		x = n->x;
-    
-    int		neg;
+  int		num = *n->num;
+  if(n->oldnum == num && ! refresh ) {
+    return ;
+  }
+  int		numdigits = n->width;
+  
+  int		w = SHORT(n->p[0]->width);
+  int		h = SHORT(n->p[0]->height);
+  int		x = n->x;
+  
+  int		neg;
 
     n->oldnum = *n->num;
 

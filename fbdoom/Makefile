@@ -5,7 +5,7 @@
 # $Log:$
 #
 
-CROSS_COMPILE = riscv32-unknown-elf-
+
 VB=''
 
 #LIBS+=-lXext -lX11 -lnsl -lm -lSDL
@@ -14,10 +14,11 @@ VB=''
 OBJS+=$(OBJDIR)/i_video_fbdev.o
 OBJS+=$(OBJDIR)/i_input_tty.o
 
-CC=$(CROSS_COMPILE)gcc  # gcc or g++
-CFLAGS+=-O3
-LDFLAGS+=-Wl,--gc-sections
-CFLAGS+=-Wall -DNORMALUNIX -DLINUX -DSNDSERV # -DUSEASM
+CC=/home/dsheffie/buildroot/output/host/bin/riscv64-buildroot-linux-gnu-gcc
+CFLAGS+=-O3 -flto -march=rv64ima_zicond_zbb_zba_zicsr_zifencei -std=gnu99
+LDFLAGS+=-Wl,--gc-sections -z max-page-size=65536
+CFLAGS+=-Wall -DNORMALUNIX -DLINUX -DSNDSERV
+
 LIBS+=-lm -lc
 NOSDL=1
 
@@ -42,9 +43,8 @@ clean:
 
 $(OUTPUT):	$(OBJS)
 	@echo [Linking $@]
-	$(VB)$(CC) $(CFLAGS) $(LDFLAGS) $(OBJS) -o $(OUTPUT) $(LIBS) -Wl,-Map,$(OUTPUT).map -specs=htif.specs
-	@echo [Size]
-	-$(CROSS_COMPILE)size $(OUTPUT)
+	$(VB)$(CC) $(CFLAGS) $(LDFLAGS) $(OBJS) -o $(OUTPUT) $(LIBS) -Wl,-Map,$(OUTPUT).map
+
 
 $(OBJS): | $(OBJDIR)
 
