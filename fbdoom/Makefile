@@ -15,7 +15,7 @@ OBJS+=$(OBJDIR)/i_video_fbdev.o
 OBJS+=$(OBJDIR)/i_input_tty.o
 
 CC=/home/dsheffie/buildroot/output/host/bin/riscv64-buildroot-linux-gnu-gcc
-CFLAGS+=-O3 -flto -march=rv64ima_zicond_zbb_zba_zicsr_zifencei -std=gnu99
+CFLAGS+=-O3 -flto -march=rv64ima_zicond_zbb_zba_zicsr_zifencei_zicbop -std=gnu99
 LDFLAGS+=-Wl,--gc-sections -z max-page-size=65536
 CFLAGS+=-Wall -DNORMALUNIX -DLINUX -DSNDSERV
 
@@ -43,7 +43,7 @@ clean:
 
 $(OUTPUT):	$(OBJS)
 	@echo [Linking $@]
-	$(VB)$(CC) $(CFLAGS) $(LDFLAGS) $(OBJS) -o $(OUTPUT) $(LIBS) -Wl,-Map,$(OUTPUT).map
+	$(VB)$(CC) $(CFLAGS) $(LDFLAGS) $(OBJS) -o $(OUTPUT) $(LIBS) -static -Wl,-Map,$(OUTPUT).map
 
 
 $(OBJS): | $(OBJDIR)

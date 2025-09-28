@@ -154,8 +154,6 @@ void I_InitGraphics (void)
     fbsz = next_pow2(SCREENWIDTH * SCREENHEIGHT * 4);
     I_VideoBuffer_FB = (byte*)mmap_mem(fbsz*2);
 
-
-    
     screenvisible = true;
     
     extern int I_InitInput(void);
@@ -203,7 +201,13 @@ static double last_time = 0.0;
 #define FRAMES_PER_STAT (512)
 int bufid = 0;
 
-#define PREFETCH(X) { (void)*((volatile unsigned char*)(X)); }
+/* #define PREFETCH(X) { (void)*((volatile unsigned char*)(X)); }*/
+#define PREFETCH(X) { __builtin_prefetch(X, 0, 1); }
+
+static inline uint64_t extract_byte(uint64_t u64, int b) {
+  return (u64 >> (b * 8))& 0xff;
+}
+
 
 void I_FinishUpdate (void) {
   unsigned char *line_in = (unsigned char *) I_VideoBuffer;
@@ -212,16 +216,20 @@ void I_FinishUpdate (void) {
   uint32_t *colors_32 = (uint32_t*)colors;  
   bufid = (bufid+1) & 1;
 
+  PREFETCH(&line_in[0]);
+  PREFETCH(&line_in[16]);
+  PREFETCH(&line_in[32]);  
+  
   for(int ii = 0, j=0; ii < SCREENWIDTH*SCREENHEIGHT; ii+=16) {
     /* pretetch pixel on next cacheline */
     //unsigned char pf = *((volatile unsigned char*)&line_in[ii+16]);
     //(void)pf;
-    PREFETCH(&line_in[ii+16]);
+    PREFETCH(&line_in[ii+48]);
     
-    PREFETCH(&line_out64[j+8]);
-    PREFETCH(&line_out64[j+10]);
-    PREFETCH(&line_out64[j+12]);
-    PREFETCH(&line_out64[j+14]);            
+    //PREFETCH(&line_out64[j+8]);
+    // PREFETCH(&line_out64[j+10]);
+    //PREFETCH(&line_out64[j+12]);
+    //PREFETCH(&line_out64[j+14]);            
     asm __volatile__("": : :"memory");
     
     for(int i = ii; i < (ii+16); i+=2) {
