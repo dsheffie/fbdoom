@@ -116,13 +116,16 @@ static double timestamp() {
         : "+r"(a0) : __VA_ARGS__ : "memory"); \
 	return a0; \
 
-
+#ifdef __clang__
+static inline long va2pa(void *a) { return 0x600000; }
+#else
 static inline long va2pa(void *a)
 {
   register long a7 __asm__("a7") = 257;
   register long a0 __asm__("a0") = (uintptr_t)a;
   __asm_syscall("r"(a7), "0"(a0))
 }
+#endif
 
 
 static void* mmap_mem(size_t n_bytes) {
@@ -152,7 +155,7 @@ void I_InitGraphics (void)
     I_VideoBuffer = (byte*)mmap_mem(SCREENWIDTH * SCREENHEIGHT);
 
     fbsz = next_pow2(SCREENWIDTH * SCREENHEIGHT * 4);
-    I_VideoBuffer_FB = (byte*)mmap_mem(fbsz*2);
+    I_VideoBuffer_FB = (byte*)mmap_mem(fbsz*4);
 
     screenvisible = true;
     
@@ -162,7 +165,7 @@ void I_InitGraphics (void)
 
 void I_ShutdownGraphics (void) {
   munmap(I_VideoBuffer, SCREENWIDTH * SCREENHEIGHT);
-  munmap(I_VideoBuffer_FB, 2*fbsz);
+  munmap(I_VideoBuffer_FB, 4*fbsz);
 }
 
 void I_StartFrame (void)
@@ -214,7 +217,7 @@ void I_FinishUpdate (void) {
   volatile struct color *line_out = (volatile struct color*) &I_VideoBuffer_FB[bufid*fbsz];
   volatile uint64_t *line_out64 = (volatile uint64_t*) &I_VideoBuffer_FB[bufid*fbsz];
   uint32_t *colors_32 = (uint32_t*)colors;  
-  bufid = (bufid+1) & 1;
+  //bufid = (bufid+1) & 3;
 
   PREFETCH(&line_in[0]);
   PREFETCH(&line_in[16]);
@@ -231,20 +234,64 @@ void I_FinishUpdate (void) {
     //PREFETCH(&line_out64[j+12]);
     //PREFETCH(&line_out64[j+14]);            
     asm __volatile__("": : :"memory");
-    
-    for(int i = ii; i < (ii+16); i+=2) {
-      uint64_t c = colors_32[line_in[i+0]];
-      c |=  ((uint64_t)colors_32[line_in[i+1]]) <<32;
+
+    uint64_t l0 = *(uint64_t*)&line_in[ii];
+    {
+      uint64_t c = colors_32[extract_byte(l0, 0)];
+      c |=  ((uint64_t)colors_32[extract_byte(l0, 1)]) <<32;
       line_out64[j++] = c;
     }
+    asm __volatile__("": : :"memory");    
+    {
+      uint64_t c = colors_32[extract_byte(l0, 2)];
+      c |=  ((uint64_t)colors_32[extract_byte(l0, 3)]) <<32;
+      line_out64[j++] = c;
+    }
+    asm __volatile__("": : :"memory");    
+    {
+      uint64_t c = colors_32[extract_byte(l0, 4)];
+      c |=  ((uint64_t)colors_32[extract_byte(l0, 5)]) <<32;
+      line_out64[j++] = c;
+    }
+    asm __volatile__("": : :"memory");
+    {
+      uint64_t c = colors_32[extract_byte(l0, 6)];
+      c |=  ((uint64_t)colors_32[extract_byte(l0, 7)]) <<32;
+      line_out64[j++] = c;
+    }    
+    l0  = *(uint64_t*)&line_in[ii+8];      
+    {
+      uint64_t c = colors_32[extract_byte(l0, 0)];
+      c |=  ((uint64_t)colors_32[extract_byte(l0, 1)]) <<32;
+      line_out64[j++] = c;
+    }
+    asm __volatile__("": : :"memory");    
+    {
+      uint64_t c = colors_32[extract_byte(l0, 2)];
+      c |=  ((uint64_t)colors_32[extract_byte(l0, 3)]) <<32;
+      line_out64[j++] = c;
+    }
+    asm __volatile__("": : :"memory");    
+    {
+      uint64_t c = colors_32[extract_byte(l0, 4)];
+      c |=  ((uint64_t)colors_32[extract_byte(l0, 5)]) <<32;
+      line_out64[j++] = c;
+    }
+    asm __volatile__("": : :"memory");
+    {
+      uint64_t c = colors_32[extract_byte(l0, 6)];
+      c |=  ((uint64_t)colors_32[extract_byte(l0, 7)]) <<32;
+      line_out64[j++] = c;
+    }    
   }
+  asm volatile ("fence.i" ::: "memory");
   
   //for(int i = 0,j=0; i < SCREENWIDTH*SCREENHEIGHT; i+=2,j++) {
   //uint64_t c = colors_32[line_in[i+0]];
   //c |=  ((uint64_t)colors_32[line_in[i+1]]) <<32;
   //line_out64[j] = c;
   //}
-  // asm volatile ("fence.i" ::: "memory"); 
+  // 
 
   
   if((n_frames_rendered % FRAMES_PER_STAT) == 0) {

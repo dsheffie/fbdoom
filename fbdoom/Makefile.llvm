@@ -8,23 +8,20 @@
 
 VB=''
 
-#LIBS+=-lXext -lX11 -lnsl -lm -lSDL
-#CFLAGS+=-Wunused-const-variable=0 
-#CFLAGS+=-fsanitize=address
+
 OBJS+=$(OBJDIR)/i_video_fbdev.o
 OBJS+=$(OBJDIR)/i_input_tty.o
 
-CC=/home/dsheffie/buildroot/output/host/bin/riscv64-buildroot-linux-gnu-gcc
-CFLAGS+=-O3 -flto -std=gnu99 -fomit-frame-pointer -march=rv64ima_zicond_zbb_zba_zicsr_zifencei #_zicbop
+
+CFLAGS = -O3 -flto -std=gnu99 -mcpu=dsheffie-rv64 -march=rv64ima_zicond_zbb_zba_zicsr_zifencei
+CC = /home/dsheffie/rv64-llvm/bin/clang --target=riscv64-buildroot-linux-gnu
+
 LDFLAGS+=-Wl,--gc-sections -z max-page-size=65536
 CFLAGS+=-Wall -DNORMALUNIX -DLINUX -DSNDSERV
 
 LIBS+=-lm -lc
 NOSDL=1
 
-ifneq ($(NOSDL),1)
-	LIBS+= -lSDL
-endif
 
 # subdirectory for objects
 OBJDIR=build
@@ -43,7 +40,7 @@ clean:
 
 $(OUTPUT):	$(OBJS)
 	@echo [Linking $@]
-	$(VB)$(CC) $(CFLAGS) $(LDFLAGS) $(OBJS) -o $(OUTPUT) $(LIBS) -static -Wl,-Map,$(OUTPUT).map
+	$(VB)$(CC) $(CFLAGS) $(LDFLAGS) $(OBJS) -o $(OUTPUT) $(LIBS)
 
 
 $(OBJS): | $(OBJDIR)
